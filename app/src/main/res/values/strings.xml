@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Kaleidoscope</string>
+    <string name="power_button">power button</string>
+    <string name="applogo">applogo</string>
+    <string name="kaleidoscope">Kaleidoscope</string>
+    <string name="colorwheel">Color Wheel</string>
+</resources>

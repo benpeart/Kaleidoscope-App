@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#f1faee"
+    tools:context=".MainActivity">
+
+
+    <SeekBar
+        android:id="@+id/brightness_seekbar"
+        android:layout_width="350dp"
+        android:layout_height="40dp"
+        android:layout_marginBottom="32dp"
+        android:progressBackgroundTint="@color/progressBar"
+        android:progressTint="#1d3557"
+        android:thumb="@drawable/ic_baseline_brightness_7_24"
+        app:layout_constraintBottom_toTopOf="@+id/powerButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <SeekBar
+        android:id="@+id/speed_seekbar"
+        android:layout_width="350dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="32dp"
+        android:progressBackgroundTint="@color/progressBar"
+        android:progressTint="#1d3557"
+        android:thumb="@drawable/ic_baseline_speed_24"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.491"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/powerButton" />
+
+    <Spinner
+        android:id="@+id/clockFacesSpinner"
+        android:layout_width="350dp"
+        android:layout_height="50dp"
+        android:spinnerMode="dropdown"
+        app:layout_constraintBottom_toTopOf="@+id/drawStylesSpinner"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Spinner
+        android:id="@+id/drawStylesSpinner"
+        android:layout_width="350dp"
+        android:layout_height="50dp"
+        android:layout_marginBottom="16dp"
+        android:spinnerMode="dropdown"
+        app:layout_constraintBottom_toTopOf="@+id/brightness_seekbar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Spinner
+        android:id="@+id/modeNamesSpinner"
+        android:layout_width="350dp"
+        android:layout_height="50dp"
+        android:layout_below="@+id/clockFacesSpinner"
+        android:spinnerMode="dropdown"
+        app:layout_constraintBottom_toTopOf="@+id/clockFacesSpinner"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/powerButton"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:backgroundTint="@color/powerButtonBlue"
+        android:contentDescription="@string/power_button"
+        app:backgroundTint="#f1faee"
+        app:fabCustomSize="80dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:maxImageSize="60dp"
+        app:srcCompat="@drawable/ic_baseline_power_settings_new_24"
+        app:tint="#1d3557" />
+
+    <TextView
+        android:id="@+id/logo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:fontFamily="sans-serif"
+        android:text="@string/kaleidoscope"
+        android:textColor="@color/textColor"
+        android:textSize="30sp"
+        app:layout_constraintStart_toStartOf="@+id/modeNamesSpinner"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TableRow
+        android:id="@+id/hr"
+        android:layout_width="350dp"
+        android:layout_height="1dp"
+        android:background="@color/grey"
+        app:layout_constraintStart_toStartOf="@+id/modeNamesSpinner"
+        app:layout_constraintTop_toBottomOf="@+id/logo" />
+
+    <ImageButton
+        android:id="@+id/colorWheelButton"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:background="#f1faee"
+        android:contentDescription="@string/colorwheel"
+        android:scaleType="fitCenter"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/speed_seekbar"
+        app:srcCompat="@mipmap/ic_launcher_foreground" />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
