@@ -286,7 +286,7 @@ public class MainActivity extends AppCompatActivity {
                     jsonParam.put("mode", MainActivity.mode);
                     jsonParam.put("clockFace", MainActivity.clockFace);
                     jsonParam.put("drawStyle", MainActivity.drawStyle);
-                    jsonParam.put("handsColor", MainActivity.clockColor);
+                    jsonParam.put("clockColor", MainActivity.clockColor);
 
                     Log.i("JSON", jsonParam.toString());
                     DataOutputStream os = new DataOutputStream(conn.getOutputStream());
@@ -475,7 +475,7 @@ public class MainActivity extends AppCompatActivity {
                         mode = (String) settings.get("mode");
                         clockFace = (String) settings.get("clockFace");
                         drawStyle = (String) settings.get("drawStyle");
-                        clockColor = (int) settings.get("handsColor");
+                        clockColor = (int) settings.get("clockColor");
                         setValuesFromSettings();
                         settingUp = false;
                     } catch (JSONException e) {
