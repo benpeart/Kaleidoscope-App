@@ -148,13 +148,15 @@ public class MainActivity extends AppCompatActivity {
 
 
         // changes the speed of the kaleidoscope
+        speedSeekBar.setMin(0);
+        speedSeekBar.setMax(255);
         speedSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             boolean wasItUs = false;
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (wasItUs) {
-                    MainActivity.speed = getSpeedFromProgress(progress);
+                    MainActivity.speed = progress;
                     makePost("progress changed speed");
                 }
             }
@@ -174,13 +176,15 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // changes the brightness of the kaleidoscope
+        brightnessSeekBar.setMin(-255);
+        brightnessSeekBar.setMax(255);
         brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             boolean wasItUs = false;
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (wasItUs) {
-                    MainActivity.brightness = getBrightnessFromProgress(progress);
+                    MainActivity.brightness = progress;
                     makePost("progress changed brightness");
                 }
             }
@@ -487,8 +491,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setValuesFromSettings() {
-        brightnessSeekBar.setProgress(getProgressFromBrightness(brightness));
-        speedSeekBar.setProgress(getProgressFromSpeed(speed));
+        brightnessSeekBar.setProgress(brightness);
+        speedSeekBar.setProgress(speed);
         modeNamesSpinner.setSelection(modeNamesList.indexOf(mode));
         clockFacesSpinner.setSelection(clockFacesList.indexOf(clockFace));
         drawStylesSpinner.setSelection(drawStylesList.indexOf(drawStyle));
@@ -498,26 +502,6 @@ public class MainActivity extends AppCompatActivity {
             powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
     }
 
-    private int getProgressFromSpeed(int speed) {
-        //int p = 100 - (int) (100 * (Math.exp(( (double) speed / 1000) * Math.log(2)) - 1));
-        //return Math.max(p, 0);
-        return speed * 100 / 255;
-    }
-
-    private int getProgressFromBrightness(int brightness) {
-        return (brightness + 305) / 44;
-    }
-
-    // returns the speed value to send to the api from the % of progress on seekbar
-    private int getSpeedFromProgress(int progress) {
-        //return 1000 - (int) (1000 * Math.log1p(((double) progress / 100)) / Math.log(2));
-        return progress * 255 / 100;
-    }
-
-    // returns the brightness value to send to the api from the % of progress on seekbar
-    private int getBrightnessFromProgress(int progress) {
-        return (progress * 44) - 305;
-    }
 /**
     // used to get rid of bars at the top of the application
     @Override
