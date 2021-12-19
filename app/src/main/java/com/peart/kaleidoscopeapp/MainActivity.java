@@ -326,23 +326,25 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                final String mMessage = response.body().string();
+                if (response.isSuccessful()) {
+                    final String mMessage = response.body().string();
 
-                MainActivity.this.runOnUiThread(() -> {
-                    Log.e("Response", mMessage);
-                    try {
-                        JSONArray faces = new JSONArray(mMessage);
+                    MainActivity.this.runOnUiThread(() -> {
+                        Log.e("Response", mMessage);
+                        try {
+                            JSONArray faces = new JSONArray(mMessage);
 
-                        for (int i = 0; i < faces.length(); i++) {
-                            String face = faces.getString(i);
-                            Log.e("clockFace", face);
-                            clockFacesList.add(face);
+                            for (int i = 0; i < faces.length(); i++) {
+                                String face = faces.getString(i);
+                                Log.e("clockFace", face);
+                                clockFacesList.add(face);
+                            }
+                            clockAdapter.notifyDataSetChanged();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
-                        clockAdapter.notifyDataSetChanged();
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                });
+                    });
+                }
             }
         });
     }
@@ -370,23 +372,25 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                final String mMessage = response.body().string();
+                if (response.isSuccessful()) {
+                    final String mMessage = response.body().string();
 
-                MainActivity.this.runOnUiThread(() -> {
-                    Log.e("Response", mMessage);
-                    try {
-                        JSONArray modes = new JSONArray(mMessage);
+                    MainActivity.this.runOnUiThread(() -> {
+                        Log.e("Response", mMessage);
+                        try {
+                            JSONArray modes = new JSONArray(mMessage);
 
-                        for (int i = 0; i < modes.length(); i++) {
-                            String mode = modes.getString(i);
-                            Log.e("clockFace", mode);
-                            modeNamesList.add(mode);
+                            for (int i = 0; i < modes.length(); i++) {
+                                String mode = modes.getString(i);
+                                Log.e("clockFace", mode);
+                                modeNamesList.add(mode);
+                            }
+                            modeAdapter.notifyDataSetChanged();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
-                        modeAdapter.notifyDataSetChanged();
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                });
+                    });
+                }
             }
         });
     }
@@ -414,23 +418,25 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                final String mMessage = response.body().string();
+                if (response.isSuccessful()) {
+                    final String mMessage = response.body().string();
 
-                MainActivity.this.runOnUiThread(() -> {
-                    Log.e("Response", mMessage);
-                    try {
-                        JSONArray modes = new JSONArray(mMessage);
+                    MainActivity.this.runOnUiThread(() -> {
+                        Log.e("Response", mMessage);
+                        try {
+                            JSONArray modes = new JSONArray(mMessage);
 
-                        for (int i = 0; i < modes.length(); i++) {
-                            String style = modes.getString(i);
-                            Log.e("drawStyle", style);
-                            drawStylesList.add(style);
+                            for (int i = 0; i < modes.length(); i++) {
+                                String style = modes.getString(i);
+                                Log.e("drawStyle", style);
+                                drawStylesList.add(style);
+                            }
+                            drawStylesAdapter.notifyDataSetChanged();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
-                        drawStylesAdapter.notifyDataSetChanged();
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                });
+                    });
+                }
             }
         });
     }
@@ -458,24 +464,26 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                final String mMessage = response.body().string();
+                if (response.isSuccessful()) {
+                    final String mMessage = response.body().string();
 
-                MainActivity.this.runOnUiThread(() -> {
-                    Log.e("Response", mMessage);
-                    try {
-                        JSONObject settings = new JSONObject(mMessage);
-                        brightness = (int) settings.get("brightness");
-                        speed = (int) settings.get("speed");
-                        mode = (String) settings.get("mode");
-                        clockFace = (String) settings.get("clockFace");
-                        drawStyle = (String) settings.get("drawStyle");
-                        clockColor = (int) settings.get("clockColor");
-                        setValuesFromSettings();
-                        settingUp = false;
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                });
+                    MainActivity.this.runOnUiThread(() -> {
+                        Log.e("Response", mMessage);
+                        try {
+                            JSONObject settings = new JSONObject(mMessage);
+                            brightness = (int) settings.get("brightness");
+                            speed = (int) settings.get("speed");
+                            mode = (String) settings.get("mode");
+                            clockFace = (String) settings.get("clockFace");
+                            drawStyle = (String) settings.get("drawStyle");
+                            clockColor = (int) settings.get("clockColor");
+                            setValuesFromSettings();
+                            settingUp = false;
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
             }
         });
     }
