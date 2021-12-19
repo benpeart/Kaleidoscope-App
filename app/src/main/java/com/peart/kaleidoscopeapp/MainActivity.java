@@ -4,7 +4,6 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.health.SystemHealthManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -52,7 +51,6 @@ public class MainActivity extends AppCompatActivity {
     boolean canFetchSettings = false;
 
     private long timeOfLastPut = 0;
-    private View decorView; // for removing action/navigation bar
     private String previousMode = "Kaleidoscope";
     private boolean settingUp = true;
 
@@ -105,14 +103,6 @@ public class MainActivity extends AppCompatActivity {
         // forces the app to stay in portrait mode
         this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-        /**
-        // used to get rid of bars at the top of the application
-        decorView = getWindow().getDecorView();
-        decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
-            if (visibility == 0)
-                decorView.setSystemUiVisibility(hideSystemBars());
-        });
-        **/
         // turns the kaleidoscope on and off
         powerButton.setOnClickListener(v -> {
             if (!mode.equals("off")) { // if it's on turn it off
@@ -502,21 +492,6 @@ public class MainActivity extends AppCompatActivity {
             powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
     }
 
-/**
-    // used to get rid of bars at the top of the application
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            decorView.setSystemUiVisibility(hideSystemBars());
-        }
-    }
-
-    // used to get rid of bars at the top of the application
-    private int hideSystemBars() {
-        return View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
-    }
-**/
     private int getRgbFromHex(String hex) { //#ffffff red green blue 0-255  ->255, 0, 0 255 255 255
         int initColor = Color.parseColor(hex);
         int r = Color.red(initColor);
