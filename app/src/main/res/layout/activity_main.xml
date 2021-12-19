@@ -12,13 +12,13 @@
         android:id="@+id/brightness_seekbar"
         android:layout_width="350dp"
         android:layout_height="40dp"
-        android:layout_marginBottom="32dp"
+        android:layout_marginTop="32dp"
         android:progressBackgroundTint="@color/progressBar"
         android:progressTint="#1d3557"
         android:thumb="@drawable/ic_baseline_brightness_7_24"
-        app:layout_constraintBottom_toTopOf="@+id/powerButton"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/drawStylesSpinner" />
 
     <SeekBar
         android:id="@+id/speed_seekbar"
@@ -38,42 +38,43 @@
         android:layout_width="350dp"
         android:layout_height="50dp"
         android:spinnerMode="dropdown"
-        app:layout_constraintBottom_toTopOf="@+id/drawStylesSpinner"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/modeNamesSpinner" />
 
     <Spinner
         android:id="@+id/drawStylesSpinner"
         android:layout_width="350dp"
         android:layout_height="50dp"
-        android:layout_marginBottom="16dp"
         android:spinnerMode="dropdown"
-        app:layout_constraintBottom_toTopOf="@+id/brightness_seekbar"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/clockFacesSpinner" />
 
     <Spinner
         android:id="@+id/modeNamesSpinner"
         android:layout_width="350dp"
         android:layout_height="50dp"
         android:layout_below="@+id/clockFacesSpinner"
+        android:layout_marginTop="16dp"
         android:spinnerMode="dropdown"
-        app:layout_constraintBottom_toTopOf="@+id/clockFacesSpinner"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/hr" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/powerButton"
         android:layout_width="80dp"
         android:layout_height="80dp"
+        android:layout_marginTop="32dp"
         android:backgroundTint="@color/powerButtonBlue"
         android:contentDescription="@string/power_button"
         app:backgroundTint="#f1faee"
         app:fabCustomSize="80dp"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/brightness_seekbar"
         app:maxImageSize="60dp"
         app:srcCompat="@drawable/ic_baseline_power_settings_new_24"
         app:tint="#1d3557" />
@@ -102,6 +103,7 @@
         android:id="@+id/colorWheelButton"
         android:layout_width="200dp"
         android:layout_height="200dp"
+        android:layout_marginBottom="20dp"
         android:background="#f1faee"
         android:contentDescription="@string/colorwheel"
         android:scaleType="fitCenter"
