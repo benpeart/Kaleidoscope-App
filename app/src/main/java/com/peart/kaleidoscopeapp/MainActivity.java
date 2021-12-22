@@ -249,15 +249,6 @@ public class MainActivity extends AppCompatActivity {
 */
     }
 
-    // TODO: we shouldn't need to do this here and in OnCreate
-/*
-    @Override
-    protected void onStart() {
-        super.onStart();
-        fetchSettings();
-    }
- */
-
     // TODO: cancel/ignore any pending fetchSettings calls when we call makePostEx
     // this will prevent an old fetch from overwriting the values we just set in makePostEx
     // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
