@@ -39,7 +39,7 @@ import top.defaults.colorpicker.ColorPickerPopup;
 public class MainActivity extends AppCompatActivity {
 
     // the maximum rate of posting to the api
-    private static final long PUT_RATE = 250; //every n ms
+    private static final long PUT_RATE = 25; //every n ms
 
     private static int speed = 0;
     private static int brightness = 0;
@@ -48,7 +48,8 @@ public class MainActivity extends AppCompatActivity {
     private static String clockFace = "";
     private static String drawStyle = "";
 
-    boolean canFetchSettings = false;
+    // TODO: replace this logic with one that just prevents updating a slider that is currently being interacted with.
+    boolean canFetchSettings = true;
 
     private long timeOfLastPut = 0;
     private String previousMode = "Kaleidoscope";
@@ -60,7 +61,6 @@ public class MainActivity extends AppCompatActivity {
     List<String> clockFacesList, modeNamesList, drawStylesList;
     ArrayAdapter<String> clockAdapter, modeAdapter, drawStylesAdapter;
     ImageButton colorWheelButton;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
                 mode = previousMode;
                 powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
             }
-            makePost("on create");
+            makePostEx(mode, null, null, null, null, null, "on create");
         });
 
         colorWheelButton.setOnClickListener(v -> new ColorPickerPopup.Builder(MainActivity.this)
@@ -131,8 +131,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onColorPicked(int color) {
                         String temp = "#" + Integer.toHexString(color);
-                        clockColor = getRgbFromHex(temp);
-                        makePost("color wheel selection");
+                        makePostEx(null, null, null, null, null, getRgbFromHex(temp), "mode names spinner selection");
                     }
                 }));
 
@@ -146,8 +145,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (wasItUs) {
-                    MainActivity.speed = progress;
-                    makePost("progress changed speed");
+                    makePostEx(null, null, null, null, progress, null, "progress changed speed");
                 }
             }
 
@@ -159,7 +157,6 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                makePost("stop tracking touch speed");
                 canFetchSettings = true;
                 wasItUs = false;
             }
@@ -174,8 +171,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (wasItUs) {
-                    MainActivity.brightness = progress;
-                    makePost("progress changed brightness");
+                    makePostEx(null, null, null, progress, null, null, "progress changed brightness = " + progress);
                 }
             }
 
@@ -187,7 +183,6 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                makePost("stop tracking touch brightness");
                 canFetchSettings = true;
                 wasItUs = false;
             }
@@ -198,8 +193,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (!parent.getItemAtPosition(position).equals("Select Mode") && !settingUp) {
-                    MainActivity.mode = modeNamesSpinner.getSelectedItem().toString();
-                    makePost("mode names spinner selection"); // getting called on create
+                    makePostEx(modeNamesSpinner.getSelectedItem().toString(), null, null, null, null, null, "mode names spinner selection");
                 }
             }
 
@@ -213,8 +207,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (!parent.getItemAtPosition(position).equals("Select Clock") && !settingUp) {
-                    MainActivity.clockFace = clockFacesSpinner.getSelectedItem().toString();
-                    makePost("clock face spinner selection");
+                    makePostEx(null, clockFacesSpinner.getSelectedItem().toString(), null, null, null, null, "mode names spinner selection");
                 }
             }
 
@@ -227,8 +220,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (!parent.getItemAtPosition(position).equals("Select Draw Style") && !settingUp) {
-                    MainActivity.drawStyle = drawStylesSpinner.getSelectedItem().toString();
-                    makePost("draw styles spinner selection"); // getting called on create
+                    makePostEx(null, null, drawStylesSpinner.getSelectedItem().toString(), null, null, null, "mode names spinner selection");
                 }
             }
 
@@ -238,6 +230,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+/*
+        // Call fetchSettings every 2 seconds to update the app with the current
+        // settings from the Kaleidoscope (in case another app or the physical knobs
+        // have been used to make changes).
+	    // TODO: This needs to be updated so that a slow fetch doesn't override settings we set via makePostEx
         final Handler handler = new Handler();
         final int refreshRate = 2000; // 2.0 sec
 
@@ -249,18 +246,22 @@ public class MainActivity extends AppCompatActivity {
                 handler.postDelayed(this, refreshRate);
             }
         }, refreshRate);
-
+*/
     }
 
-
+    // TODO: we shouldn't need to do this here and in OnCreate
+/*
     @Override
     protected void onStart() {
         super.onStart();
         fetchSettings();
     }
+ */
 
-    //posts the brightness, speed, mode and clock to the api
-    private void makePost(String s) {
+    // TODO: cancel/ignore any pending fetchSettings calls when we call makePostEx
+    // this will prevent an old fetch from overwriting the values we just set in makePostEx
+    // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
+    private void makePostEx(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
         System.out.println(s);
         Thread thread = new Thread(() -> {
             if (System.currentTimeMillis() - timeOfLastPut > PUT_RATE) {
@@ -275,12 +276,19 @@ public class MainActivity extends AppCompatActivity {
                     conn.setDoInput(true);
 
                     JSONObject jsonParam = new JSONObject();
-                    jsonParam.put("brightness", MainActivity.brightness);
-                    jsonParam.put("speed", MainActivity.speed);
-                    jsonParam.put("mode", MainActivity.mode);
-                    jsonParam.put("clockFace", MainActivity.clockFace);
-                    jsonParam.put("drawStyle", MainActivity.drawStyle);
-                    jsonParam.put("clockColor", MainActivity.clockColor);
+
+                    if (mode != null)
+                        jsonParam.put("mode", mode);
+                    if (clockFace != null)
+                        jsonParam.put("clockFace", clockFace);
+                    if (drawStyle != null)
+                        jsonParam.put("drawStyle", drawStyle);
+                    if (brightness != null)
+                        jsonParam.put("brightness", brightness);
+                    if (speed != null)
+                        jsonParam.put("speed", speed);
+                    if (clockColor != null)
+                        jsonParam.put("clockColor", clockColor);
 
                     Log.i("JSON", jsonParam.toString());
                     DataOutputStream os = new DataOutputStream(conn.getOutputStream());
@@ -477,6 +485,7 @@ public class MainActivity extends AppCompatActivity {
                             clockFace = (String) settings.get("clockFace");
                             drawStyle = (String) settings.get("drawStyle");
                             clockColor = (int) settings.get("clockColor");
+							// do this here as we know the async REST call has finally returned updated values
                             setValuesFromSettings();
                             settingUp = false;
                         } catch (JSONException e) {
