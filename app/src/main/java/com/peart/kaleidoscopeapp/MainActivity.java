@@ -28,22 +28,26 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
-import okhttp3.Call;
-import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.Call;
+import okhttp3.Callback;
+
 import top.defaults.colorpicker.ColorPickerPopup;
 
 public class MainActivity extends AppCompatActivity {
 
-    // the maximum rate of posting to the api
-    private static final long PUT_RATE = 250; //every n ms
-    private long timeOfLastPut = 0;
+    OkHttpClient client = new OkHttpClient();
+    public String baseURL = "http://kaleidoscope/api";
+    public static final String fetchTAG = "fetch";
 
     // TODO: replace this logic with logic that prevents updating any UI control that is currently being interacted with.
     // It should also prevent sending changes via makePostEx as a result of the fetchSettings call.
+    CountDownLatch doneSignal = new CountDownLatch(3);
     boolean canFetchSettings = true;
     private boolean settingUp = true;
 
@@ -83,29 +87,16 @@ public class MainActivity extends AppCompatActivity {
         modeNamesSpinner.setAdapter(modeAdapter);
         drawStylesSpinner.setAdapter(drawStylesAdapter);
 
-        modeNamesList.add("Select Mode");
-        clockFacesList.add("Select Clock");
-        drawStylesList.add("Select Draw Style");
-
         clockAdapter.notifyDataSetChanged();
         modeAdapter.notifyDataSetChanged();
         drawStylesAdapter.notifyDataSetChanged();
 
-        // TODO: these are async calls so will return before they actually update the spinners
-        // get the various lists and add them to the spinner controls
+        // asynchronously get the various arrays of names and styles and add them to the spinner controls
         fetchModeNames();
         fetchClockFaces();
         fetchDrawStyles();
 
-        // TODO: this doesn't currently work as the calls to fill the mode name list is async
-        // Pick a good default mode. This handles the case when the power is "off" when we start as
-        // we need a valid mode to set when they hit the "on" button
-        modeNamesSpinner.setSelection(1);
-
-        // TODO: this doesn't currently work as the calls to fill the spinner controls is async
-        // now update the UI with the current Kaleidoscope settings
-        fetchSettings();
-
+        // TODO: handle landscape mode as well
         // forces the app to stay in portrait mode
         this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
@@ -195,7 +186,8 @@ public class MainActivity extends AppCompatActivity {
         modeNamesSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!parent.getItemAtPosition(position).equals("Select Mode") && !settingUp) {
+                // don't change the mode if the power is 'off'
+                if (powerOn && !settingUp) {
                     makePostEx(modeNamesSpinner.getSelectedItem().toString(), null, null, null, null, null, "mode names spinner selection");
                 }
             }
@@ -209,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
         clockFacesSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!parent.getItemAtPosition(position).equals("Select Clock") && !settingUp) {
+                if (!settingUp) {
                     makePostEx(null, clockFacesSpinner.getSelectedItem().toString(), null, null, null, null, "clock faces spinner selection");
                 }
             }
@@ -222,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
         drawStylesSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!parent.getItemAtPosition(position).equals("Select Draw Style") && !settingUp) {
+                if (!settingUp) {
                     makePostEx(null, null, drawStylesSpinner.getSelectedItem().toString(), null, null, null, "clock faces spinner selection");
                 }
             }
@@ -233,13 +225,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // TODO: This needs to be updated so that a slow fetch doesn't override settings we set via makePostEx
-        /*
         // Call fetchSettings every 2 seconds to update the app with the current
         // settings from the Kaleidoscope (in case another app or the physical knobs
         // have been used to make changes).
         final Handler handler = new Handler();
-        final int refreshRate = 2000; // 2.0 sec
+        final int refreshRate = 500; // ms
 
         handler.postDelayed(new Runnable() {
             @Override
@@ -249,16 +239,23 @@ public class MainActivity extends AppCompatActivity {
                 handler.postDelayed(this, refreshRate);
             }
         }, refreshRate);
-         */
     }
 
-    // TODO: we shouldn't need to do this here and in OnCreate
-/*    @Override
+    // onStart() is called when the activity is becoming visible to the user
+    @Override
     protected void onStart() {
         super.onStart();
+
+        // block until the fetchModeNames(), fetchClockFaces, fetchDrawStyles calls complete
+        try {
+            doneSignal.await(60, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            // TODO: handle the timeout exception
+        }
+
+        // Update the UI with the current Kaleidoscope settings
         fetchSettings();
     }
- */
 
     // TODO: cancel/ignore any pending fetchSettings calls when we call makePostEx
     // TODO: do we really need to create a thread for every call? Can/should that be optimized?
@@ -267,50 +264,47 @@ public class MainActivity extends AppCompatActivity {
     private void makePostEx(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
         System.out.println(s);
         Thread thread = new Thread(() -> {
-            if (System.currentTimeMillis() - timeOfLastPut > PUT_RATE) {
-                timeOfLastPut = System.currentTimeMillis();
-                try {
-                    // TODO: why does this use HttpURLConnection when all the fetch calls use OkHttpClient?
-                    // https://code.tutsplus.com/tutorials/android-from-scratch-using-rest-apis--cms-27117
-                    // https://developer.android.com/training/volley
-                    URL url = new URL("http://kaleidoscope/api/settings");
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setRequestProperty("Accept", "*/*");
-                    conn.setDoOutput(true);
-                    conn.setDoInput(true);
+            try {
+                // TODO: why does this use HttpURLConnection when all the fetch calls use OkHttpClient?
+                // https://code.tutsplus.com/tutorials/android-from-scratch-using-rest-apis--cms-27117
+                // https://developer.android.com/training/volley
+                URL url = new URL("http://kaleidoscope/api/settings");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("Accept", "*/*");
+                conn.setDoOutput(true);
+                conn.setDoInput(true);
 
-                    JSONObject jsonParam = new JSONObject();
+                JSONObject jsonParam = new JSONObject();
 
-                    if (mode != null)
-                        jsonParam.put("mode", mode);
-                    if (clockFace != null)
-                        jsonParam.put("clockFace", clockFace);
-                    if (drawStyle != null)
-                        jsonParam.put("drawStyle", drawStyle);
-                    if (brightness != null)
-                        jsonParam.put("brightness", brightness);
-                    if (speed != null)
-                        jsonParam.put("speed", speed);
-                    if (clockColor != null)
-                        jsonParam.put("clockColor", clockColor);
+                if (mode != null)
+                    jsonParam.put("mode", mode);
+                if (clockFace != null)
+                    jsonParam.put("clockFace", clockFace);
+                if (drawStyle != null)
+                    jsonParam.put("drawStyle", drawStyle);
+                if (brightness != null)
+                    jsonParam.put("brightness", brightness);
+                if (speed != null)
+                    jsonParam.put("speed", speed);
+                if (clockColor != null)
+                    jsonParam.put("clockColor", clockColor);
 
-                    Log.i("JSON", jsonParam.toString());
-                    DataOutputStream os = new DataOutputStream(conn.getOutputStream());
-                    os.writeBytes(jsonParam.toString());
+                Log.i("JSON", jsonParam.toString());
+                DataOutputStream os = new DataOutputStream(conn.getOutputStream());
+                os.writeBytes(jsonParam.toString());
 
-                    os.flush();
-                    os.close();
+                os.flush();
+                os.close();
 
-                    Log.i("STATUS", String.valueOf(conn.getResponseCode()));
-                    Log.i("MSG", conn.getResponseMessage());
+                Log.i("STATUS", String.valueOf(conn.getResponseCode()));
+                Log.i("MSG", conn.getResponseMessage());
 
-                    conn.disconnect();
+                conn.disconnect();
 
-                } catch (IOException | JSONException e) {
-                    e.printStackTrace();
-                }
+            } catch (IOException | JSONException e) {
+                e.printStackTrace();
             }
         });
         thread.start();
@@ -318,10 +312,7 @@ public class MainActivity extends AppCompatActivity {
 
     // gets the list of clock faces from the api and adds it to spinner
     private void fetchClockFaces() {
-
-        String url = "http://kaleidoscope/api/faces";
-
-        OkHttpClient client = new OkHttpClient();
+        String url = baseURL + "/faces";
 
         Request request = new Request.Builder()
                 .url(url)
@@ -359,18 +350,18 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
+                doneSignal.countDown();
             }
         });
     }
 
     // gets the list of mode names from the api and adds it to spinner
     private void fetchModeNames() {
-        String url = "http://kaleidoscope/api/modes";
-
-        OkHttpClient client = new OkHttpClient();
+        String url = baseURL + "/modes";
 
         Request request = new Request.Builder()
                 .url(url)
+                .tag(fetchTAG)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
@@ -405,18 +396,18 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
+                doneSignal.countDown();
             }
         });
     }
 
     // gets the list of draw types
     private void fetchDrawStyles() {
-        String url = "http://kaleidoscope/api/drawstyles";
-
-        OkHttpClient client = new OkHttpClient();
+        String url = baseURL + "/drawstyles";
 
         Request request = new Request.Builder()
                 .url(url)
+                .tag(fetchTAG)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
@@ -451,18 +442,18 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
+                doneSignal.countDown();
             }
         });
     }
 
     // gets the current list of settings and changes our values
     private void fetchSettings() {
-        String url = "http://kaleidoscope/api/settings";
-
-        OkHttpClient client = new OkHttpClient();
+        String url = baseURL + "/settings";
 
         Request request = new Request.Builder()
                 .url(url)
+                .tag(fetchTAG)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
@@ -520,5 +511,17 @@ public class MainActivity extends AppCompatActivity {
         int g = Color.green(initColor);
         int b = Color.blue(initColor);
         return r << 16 | g << 8 | b;
+    }
+
+    private void cancelCallWithTag(OkHttpClient client, String tag) {
+        // A call may transition from queue -> running. Remove queued Calls first.
+        for(Call call : client.dispatcher().queuedCalls()) {
+            if(call.request().tag().equals(tag))
+                call.cancel();
+        }
+        for(Call call : client.dispatcher().runningCalls()) {
+            if(call.request().tag().equals(tag))
+                call.cancel();
+        }
     }
 }
