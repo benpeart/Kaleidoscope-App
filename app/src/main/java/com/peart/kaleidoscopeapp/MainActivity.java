@@ -33,23 +33,29 @@ import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.MediaType;
 
 import top.defaults.colorpicker.ColorPickerPopup;
 
 public class MainActivity extends AppCompatActivity {
 
+    // the maximum rate of posting to the api
+    private static final long POST_RATE = 250; //every n ms
+    private long timeOfLastPOST = 0;
+
     OkHttpClient client = new OkHttpClient();
     public String baseURL = "http://kaleidoscope/api";
     public static final String fetchTAG = "fetch";
 
-    // TODO: replace this logic with logic that prevents updating any UI control that is currently being interacted with.
-    // It should also prevent sending changes via makePostEx as a result of the fetchSettings call.
+    // Ensure the UI spinners have been populated before we initialize their state from fetchSettings
     CountDownLatch doneSignal = new CountDownLatch(3);
-    boolean canFetchSettings = true;
-    private boolean settingUp = true;
+
+    // Prevent sending updates to the Kaleidoscope as a result of a fetchSettings call
+    boolean shouldUpdateKaleidoscope = true;
 
     // track the power on/off state and clock color here as they don't have persistent state in the UI controls
     boolean powerOn = true;
@@ -104,11 +110,11 @@ public class MainActivity extends AppCompatActivity {
         powerButton.setOnClickListener(v -> {
             if (powerOn) { // if it's on turn it off
                 powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonRed));
-                makePostEx("Off", null, null, null, null, null, "power button onClick");
+                makePost("Off", null, null, null, null, null, "power button onClick");
                 powerOn = false;
             } else { // if it's off turn it on
                 powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
-                makePostEx(modeNamesSpinner.getSelectedItem().toString(), null, null, null, null, null, "power button onClick");
+                makePost(modeNamesSpinner.getSelectedItem().toString(), null, null, null, null, null, "power button onClick");
                 powerOn = true;
             }
         });
@@ -126,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onColorPicked(int color) {
                         clockColor = getRgbFromHex("#" + Integer.toHexString(color));
-                        makePostEx(null, null, null, null, null, clockColor, "colorWheelButton onClick");
+                        makePost(null, null, null, null, null, clockColor, "colorWheelButton onClick");
                     }
                 }));
 
@@ -134,25 +140,26 @@ public class MainActivity extends AppCompatActivity {
         speedSeekBar.setMin(0);
         speedSeekBar.setMax(255);
         speedSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            boolean wasItUs = false;
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (wasItUs) {
-                    makePostEx(null, null, null, null, progress, null, "onProgressChanged speed");
-                }
+
+                // dragging the slider can cause a flood of events
+                // throttle our POST calls so we don't overwhelm the Kaleidoscope
+                if (System.currentTimeMillis() < timeOfLastPOST + POST_RATE)
+                    return;
+                timeOfLastPOST = System.currentTimeMillis();
+
+                makePost(null, null, null, null, progress, null, "onProgressChanged speed");
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                wasItUs = true;
-                canFetchSettings = false;
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                canFetchSettings = true;
-                wasItUs = false;
+                makePost(null, null, null, null, seekBar.getProgress(), null, "onProgressChanged speed");
             }
         });
 
@@ -160,25 +167,25 @@ public class MainActivity extends AppCompatActivity {
         brightnessSeekBar.setMin(-255);
         brightnessSeekBar.setMax(255);
         brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            boolean wasItUs = false;
-
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (wasItUs) {
-                    makePostEx(null, null, null, progress, null, null, "onProgressChanged brightness");
-                }
+
+                // dragging the slider can cause a flood of events
+                // throttle our POST calls so we don't overwhelm the Kaleidoscope
+                if (System.currentTimeMillis() < timeOfLastPOST + POST_RATE)
+                    return;
+                timeOfLastPOST = System.currentTimeMillis();
+
+                makePost(null, null, null, progress, null, null, "onProgressChanged brightness");
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                wasItUs = true;
-                canFetchSettings = false;
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                canFetchSettings = true;
-                wasItUs = false;
+                makePost(null, null, null, seekBar.getProgress(), null, null, "onProgressChanged brightness");
             }
         });
 
@@ -187,8 +194,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 // don't change the mode if the power is 'off'
-                if (powerOn && !settingUp) {
-                    makePostEx(modeNamesSpinner.getSelectedItem().toString(), null, null, null, null, null, "mode names spinner selection");
+                if (powerOn) {
+                    makePost(modeNamesSpinner.getSelectedItem().toString(), null, null, null, null, null, "mode names spinner selection");
                 }
             }
 
@@ -201,9 +208,7 @@ public class MainActivity extends AppCompatActivity {
         clockFacesSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!settingUp) {
-                    makePostEx(null, clockFacesSpinner.getSelectedItem().toString(), null, null, null, null, "clock faces spinner selection");
-                }
+                makePost(null, clockFacesSpinner.getSelectedItem().toString(), null, null, null, null, "clock faces spinner selection");
             }
 
             @Override
@@ -214,9 +219,7 @@ public class MainActivity extends AppCompatActivity {
         drawStylesSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!settingUp) {
-                    makePostEx(null, null, drawStylesSpinner.getSelectedItem().toString(), null, null, null, "clock faces spinner selection");
-                }
+                makePost(null, null, drawStylesSpinner.getSelectedItem().toString(), null, null, null, "clock faces spinner selection");
             }
 
             @Override
@@ -229,13 +232,12 @@ public class MainActivity extends AppCompatActivity {
         // settings from the Kaleidoscope (in case another app or the physical knobs
         // have been used to make changes).
         final Handler handler = new Handler();
-        final int refreshRate = 500; // ms
+        final int refreshRate = 2000; // 2.0 sec
 
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (canFetchSettings)
-                    fetchSettings();
+                fetchSettings();
                 handler.postDelayed(this, refreshRate);
             }
         }, refreshRate);
@@ -257,12 +259,89 @@ public class MainActivity extends AppCompatActivity {
         fetchSettings();
     }
 
-    // TODO: cancel/ignore any pending fetchSettings calls when we call makePostEx
-    // TODO: do we really need to create a thread for every call? Can/should that be optimized?
-    // this will prevent an old fetch from overwriting the values we just set in makePostEx
     // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
     private void makePostEx(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
+
+        if (!shouldUpdateKaleidoscope)
+            return;
         System.out.println(s);
+
+        // cancel any pending fetch requests so that they don't overwrite what we're about to set.
+        cancelCallWithTag(client, fetchTAG);
+
+        // assemble the JSON object
+        JSONObject json = new JSONObject();
+        try {
+
+            if (mode != null)
+                json.put("mode", mode);
+            if (clockFace != null)
+                json.put("clockFace", clockFace);
+            if (drawStyle != null)
+                json.put("drawStyle", drawStyle);
+            if (brightness != null)
+                json.put("brightness", brightness);
+            if (speed != null)
+                json.put("speed", speed);
+            if (clockColor != null)
+                json.put("clockColor", clockColor);
+
+            Log.i("JSON", json.toString());
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        // create the request
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json.toString(), JSON);
+        Request request = new Request.Builder()
+                .url(baseURL + "/settings")
+                .post(body)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                String mMessage = e.getMessage();
+                Log.w("makePost:onFailure: ", mMessage);
+            }
+
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+
+                if (response.isSuccessful()) {
+                    final String mMessage = response.body().string();
+                    Log.w("makePost:onResponse: ", mMessage);
+                }
+                doneSignal.countDown();
+            }
+        });
+        /*
+        Response response = null;
+        try {
+            response = client.newCall(request).execute();
+            String resStr = response.body().string();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+         */
+    }
+
+    // TODO: do we really need to create a thread for every call? Can/should that be optimized?
+    // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
+    private void makePost(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
+
+		// don't send settings to the Kaleidoscope if we're updating the UI from the call to fetch
+        if (!shouldUpdateKaleidoscope)
+            return;
+
+        System.out.println(s);
+
+        // cancel any pending fetch requests so that they don't overwrite what we're about to set.
+        cancelCallWithTag(client, fetchTAG);
+
         Thread thread = new Thread(() -> {
             try {
                 // TODO: why does this use HttpURLConnection when all the fetch calls use OkHttpClient?
@@ -361,7 +440,6 @@ public class MainActivity extends AppCompatActivity {
 
         Request request = new Request.Builder()
                 .url(url)
-                .tag(fetchTAG)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
@@ -407,7 +485,6 @@ public class MainActivity extends AppCompatActivity {
 
         Request request = new Request.Builder()
                 .url(url)
-                .tag(fetchTAG)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
@@ -477,6 +554,10 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             JSONObject settings = new JSONObject(mMessage);
 
+                            // we don't want to send updates to the Kaleidoscope when updating the UI to match it's current state
+                            shouldUpdateKaleidoscope = false;
+
+                            // update the UI to reflect the current Kaleidoscope settings
                             String mode = settings.getString("mode");
                             modeNamesSpinner.setSelection(modeNamesList.indexOf(mode));
                             clockFacesSpinner.setSelection(clockFacesList.indexOf(settings.getString("clockFace")));
@@ -495,7 +576,7 @@ public class MainActivity extends AppCompatActivity {
                                 powerOn = true;
                             }
 
-                            settingUp = false;
+                            shouldUpdateKaleidoscope = true;
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
@@ -514,6 +595,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void cancelCallWithTag(OkHttpClient client, String tag) {
+        if (client == null || tag == null)
+            return;
+
         // A call may transition from queue -> running. Remove queued Calls first.
         for(Call call : client.dispatcher().queuedCalls()) {
             if(call.request().tag().equals(tag))
