@@ -54,9 +54,6 @@ public class MainActivity extends AppCompatActivity {
     // Ensure the UI spinners have been populated before we initialize their state from fetchSettings
     CountDownLatch doneSignal = new CountDownLatch(3);
 
-    // Prevent sending updates to the Kaleidoscope as a result of a fetchSettings call
-    boolean shouldUpdateKaleidoscope = true;
-
     // track the power on/off state and clock color here as they don't have persistent state in the UI controls
     boolean powerOn = true;
     int clockColor = 0;
@@ -159,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                makePost(null, null, null, null, seekBar.getProgress(), null, "onProgressChanged speed");
+                makePost(null, null, null, null, seekBar.getProgress(), null, "onStopTrackingTouch speed");
             }
         });
 
@@ -185,7 +182,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                makePost(null, null, null, seekBar.getProgress(), null, null, "onProgressChanged brightness");
+                makePost(null, null, null, seekBar.getProgress(), null, null, "onStopTrackingTouch brightness");
             }
         });
 
@@ -260,11 +257,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
-    private void makePostEx(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
+    private void makePostNew(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
 
-        if (!shouldUpdateKaleidoscope)
-            return;
-        System.out.println(s);
+        Log.i("makePost", s);
 
         // cancel any pending fetch requests so that they don't overwrite what we're about to set.
         cancelCallWithTag(client, fetchTAG);
@@ -286,13 +281,13 @@ public class MainActivity extends AppCompatActivity {
             if (clockColor != null)
                 json.put("clockColor", clockColor);
 
-            Log.i("JSON", json.toString());
+            Log.i("makePost::JSON", json.toString());
         } catch (JSONException e) {
             e.printStackTrace();
         }
 
         // create the request
-        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        MediaType JSON = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(json.toString(), JSON);
         Request request = new Request.Builder()
                 .url(baseURL + "/settings")
@@ -303,41 +298,21 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                String mMessage = e.getMessage();
-                Log.w("makePost:onFailure: ", mMessage);
+                Log.e("makePost::onFailure: ", e.getMessage());
             }
 
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-
-                if (response.isSuccessful()) {
-                    final String mMessage = response.body().string();
-                    Log.w("makePost:onResponse: ", mMessage);
-                }
-                doneSignal.countDown();
+                Log.i("makePost::onResponse", String.valueOf(response.code() + " " + response.networkResponse().message()));
             }
         });
-        /*
-        Response response = null;
-        try {
-            response = client.newCall(request).execute();
-            String resStr = response.body().string();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-         */
     }
 
     // TODO: do we really need to create a thread for every call? Can/should that be optimized?
     // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
     private void makePost(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
 
-		// don't send settings to the Kaleidoscope if we're updating the UI from the call to fetch
-        if (!shouldUpdateKaleidoscope)
-            return;
-
-        System.out.println(s);
+        Log.i("makePost", s);
 
         // cancel any pending fetch requests so that they don't overwrite what we're about to set.
         cancelCallWithTag(client, fetchTAG);
@@ -347,7 +322,7 @@ public class MainActivity extends AppCompatActivity {
                 // TODO: why does this use HttpURLConnection when all the fetch calls use OkHttpClient?
                 // https://code.tutsplus.com/tutorials/android-from-scratch-using-rest-apis--cms-27117
                 // https://developer.android.com/training/volley
-                URL url = new URL("http://kaleidoscope/api/settings");
+                URL url = new URL(baseURL + "/settings");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
@@ -355,30 +330,29 @@ public class MainActivity extends AppCompatActivity {
                 conn.setDoOutput(true);
                 conn.setDoInput(true);
 
-                JSONObject jsonParam = new JSONObject();
+                JSONObject json = new JSONObject();
 
                 if (mode != null)
-                    jsonParam.put("mode", mode);
+                    json.put("mode", mode);
                 if (clockFace != null)
-                    jsonParam.put("clockFace", clockFace);
+                    json.put("clockFace", clockFace);
                 if (drawStyle != null)
-                    jsonParam.put("drawStyle", drawStyle);
+                    json.put("drawStyle", drawStyle);
                 if (brightness != null)
-                    jsonParam.put("brightness", brightness);
+                    json.put("brightness", brightness);
                 if (speed != null)
-                    jsonParam.put("speed", speed);
+                    json.put("speed", speed);
                 if (clockColor != null)
-                    jsonParam.put("clockColor", clockColor);
+                    json.put("clockColor", clockColor);
 
-                Log.i("JSON", jsonParam.toString());
+                Log.i("makePost JSON", json.toString());
                 DataOutputStream os = new DataOutputStream(conn.getOutputStream());
-                os.writeBytes(jsonParam.toString());
+                os.writeBytes(json.toString());
 
                 os.flush();
                 os.close();
 
-                Log.i("STATUS", String.valueOf(conn.getResponseCode()));
-                Log.i("MSG", conn.getResponseMessage());
+                Log.i("makePost::Response", String.valueOf(conn.getResponseCode() + " " + conn.getResponseMessage()));
 
                 conn.disconnect();
 
@@ -404,7 +378,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
                 String mMessage = e.getMessage();
-                Log.w("failure Response", mMessage);
+                Log.e("fetchClockFaces::onFailure", mMessage);
             }
 
             @Override
@@ -414,14 +388,12 @@ public class MainActivity extends AppCompatActivity {
                     final String mMessage = response.body().string();
 
                     MainActivity.this.runOnUiThread(() -> {
-                        Log.e("Response", mMessage);
+                        Log.i("fetchClockFaces::onResponse", mMessage);
                         try {
                             JSONArray faces = new JSONArray(mMessage);
 
                             for (int i = 0; i < faces.length(); i++) {
-                                String face = faces.getString(i);
-                                Log.e("clockFace", face);
-                                clockFacesList.add(face);
+                                clockFacesList.add(faces.getString(i));
                             }
                             clockAdapter.notifyDataSetChanged();
                         } catch (JSONException e) {
@@ -449,7 +421,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
                 String mMessage = e.getMessage();
-                Log.w("failure Response", mMessage);
+                Log.e("failure Response", mMessage);
             }
 
             @Override
@@ -459,14 +431,12 @@ public class MainActivity extends AppCompatActivity {
                     final String mMessage = response.body().string();
 
                     MainActivity.this.runOnUiThread(() -> {
-                        Log.e("Response", mMessage);
+                        Log.i("fetchModeNames::onResponse", mMessage);
                         try {
                             JSONArray modes = new JSONArray(mMessage);
 
                             for (int i = 0; i < modes.length(); i++) {
-                                String mode = modes.getString(i);
-                                Log.e("clockFace", mode);
-                                modeNamesList.add(mode);
+                                modeNamesList.add(modes.getString(i));
                             }
                             modeAdapter.notifyDataSetChanged();
                         } catch (JSONException e) {
@@ -494,7 +464,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
                 String mMessage = e.getMessage();
-                Log.w("failure Response", mMessage);
+                Log.e("failure Response", mMessage);
             }
 
             @Override
@@ -504,14 +474,12 @@ public class MainActivity extends AppCompatActivity {
                     final String mMessage = response.body().string();
 
                     MainActivity.this.runOnUiThread(() -> {
-                        Log.e("Response", mMessage);
+                        Log.i("fetchDrawStyles::onResponse", mMessage);
                         try {
                             JSONArray modes = new JSONArray(mMessage);
 
                             for (int i = 0; i < modes.length(); i++) {
-                                String style = modes.getString(i);
-                                Log.e("drawStyle", style);
-                                drawStylesList.add(style);
+                                drawStylesList.add(modes.getString(i));
                             }
                             drawStylesAdapter.notifyDataSetChanged();
                         } catch (JSONException e) {
@@ -540,7 +508,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
                 String mMessage = e.getMessage();
-                Log.w("failure Response", mMessage);
+                Log.e("fetchSettings::onFailure", mMessage);
             }
 
             @Override
@@ -550,12 +518,9 @@ public class MainActivity extends AppCompatActivity {
                     final String mMessage = response.body().string();
 
                     MainActivity.this.runOnUiThread(() -> {
-                        Log.e("Response", mMessage);
+                        Log.i("fetchSettings::onResponse", mMessage);
                         try {
                             JSONObject settings = new JSONObject(mMessage);
-
-                            // we don't want to send updates to the Kaleidoscope when updating the UI to match it's current state
-                            shouldUpdateKaleidoscope = false;
 
                             // update the UI to reflect the current Kaleidoscope settings
                             String mode = settings.getString("mode");
@@ -575,8 +540,6 @@ public class MainActivity extends AppCompatActivity {
                                 powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
                                 powerOn = true;
                             }
-
-                            shouldUpdateKaleidoscope = true;
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
