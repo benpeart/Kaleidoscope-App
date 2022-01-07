@@ -22,10 +22,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +33,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
@@ -44,12 +43,12 @@ import top.defaults.colorpicker.ColorPickerPopup;
 public class MainActivity extends AppCompatActivity {
 
     // the maximum rate of posting to the api
-    private static final long POST_RATE = 250; //every n ms
+    private static final long POST_RATE = 256; //every n ms
     private long timeOfLastPOST = 0;
 
     OkHttpClient client = new OkHttpClient();
-    public String baseURL = "http://kaleidoscope/api";
-    public static final String fetchTAG = "fetch";
+    public static final String baseURL = "http://kaleidoscope/api";
+    public static final String fetchSettingsTAG = "fetch";
 
     // Ensure the UI spinners have been populated before we initialize their state from fetchSettings
     CountDownLatch doneSignal = new CountDownLatch(3);
@@ -216,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
         drawStylesSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                makePost(null, null, drawStylesSpinner.getSelectedItem().toString(), null, null, null, "clock faces spinner selection");
+                makePost(null, null, drawStylesSpinner.getSelectedItem().toString(), null, null, null, "clock styles spinner selection");
             }
 
             @Override
@@ -257,12 +256,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
-    private void makePostNew(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
+    private void makePost(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
 
         Log.i("makePost", s);
 
         // cancel any pending fetch requests so that they don't overwrite what we're about to set.
-        cancelCallWithTag(client, fetchTAG);
+        cancelCallWithTag(client, fetchSettingsTAG);
 
         // assemble the JSON object
         JSONObject json = new JSONObject();
@@ -286,9 +285,10 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
-        // create the request
-        MediaType JSON = MediaType.parse("application/json");
-        RequestBody body = RequestBody.create(json.toString(), JSON);
+        // create the request (use getBytes so that okhttp3 doesn't append the character encoding
+        // causing a 500 error as the Kaleidoscope doesn't handle encoding strings properly).
+        // see https://github.com/square/okhttp/issues/2099 for details
+        RequestBody body = RequestBody.create(json.toString().getBytes(StandardCharsets.UTF_8), MediaType.parse("application/json"));
         Request request = new Request.Builder()
                 .url(baseURL + "/settings")
                 .post(body)
@@ -304,63 +304,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
                 Log.i("makePost::onResponse", String.valueOf(response.code() + " " + response.networkResponse().message()));
+                response.close();
             }
         });
-    }
-
-    // TODO: do we really need to create a thread for every call? Can/should that be optimized?
-    // posts the brightness, speed, mode and clock to the Kaleidoscope REST API
-    private void makePost(String mode, String clockFace, String drawStyle, Integer brightness, Integer speed, Integer clockColor, String s) {
-
-        Log.i("makePost", s);
-
-        // cancel any pending fetch requests so that they don't overwrite what we're about to set.
-        cancelCallWithTag(client, fetchTAG);
-
-        Thread thread = new Thread(() -> {
-            try {
-                // TODO: why does this use HttpURLConnection when all the fetch calls use OkHttpClient?
-                // https://code.tutsplus.com/tutorials/android-from-scratch-using-rest-apis--cms-27117
-                // https://developer.android.com/training/volley
-                URL url = new URL(baseURL + "/settings");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("Accept", "*/*");
-                conn.setDoOutput(true);
-                conn.setDoInput(true);
-
-                JSONObject json = new JSONObject();
-
-                if (mode != null)
-                    json.put("mode", mode);
-                if (clockFace != null)
-                    json.put("clockFace", clockFace);
-                if (drawStyle != null)
-                    json.put("drawStyle", drawStyle);
-                if (brightness != null)
-                    json.put("brightness", brightness);
-                if (speed != null)
-                    json.put("speed", speed);
-                if (clockColor != null)
-                    json.put("clockColor", clockColor);
-
-                Log.i("makePost JSON", json.toString());
-                DataOutputStream os = new DataOutputStream(conn.getOutputStream());
-                os.writeBytes(json.toString());
-
-                os.flush();
-                os.close();
-
-                Log.i("makePost::Response", String.valueOf(conn.getResponseCode() + " " + conn.getResponseMessage()));
-
-                conn.disconnect();
-
-            } catch (IOException | JSONException e) {
-                e.printStackTrace();
-            }
-        });
-        thread.start();
     }
 
     // gets the list of clock faces from the api and adds it to spinner
@@ -369,7 +315,6 @@ public class MainActivity extends AppCompatActivity {
 
         Request request = new Request.Builder()
                 .url(url)
-                .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
 
@@ -384,23 +329,28 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                if (response.isSuccessful()) {
-                    final String mMessage = response.body().string();
+                try (ResponseBody responseBody = response.body()) {
 
-                    MainActivity.this.runOnUiThread(() -> {
-                        Log.i("fetchClockFaces::onResponse", mMessage);
-                        try {
-                            JSONArray faces = new JSONArray(mMessage);
+                    if (response.isSuccessful()) {
+                        String mMessage = responseBody.string();
 
-                            for (int i = 0; i < faces.length(); i++) {
-                                clockFacesList.add(faces.getString(i));
+                        MainActivity.this.runOnUiThread(() -> {
+                            Log.i("fetchClockFaces::onResponse", mMessage);
+                            try {
+                                JSONArray faces = new JSONArray(mMessage);
+
+                                for (int i = 0; i < faces.length(); i++) {
+                                    clockFacesList.add(faces.getString(i));
+                                }
+                                clockAdapter.notifyDataSetChanged();
+                            } catch (JSONException e) {
+                                e.printStackTrace();
                             }
-                            clockAdapter.notifyDataSetChanged();
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    });
+                        });
+                    }
                 }
+
+                // decrement the count of fetch tasks that need to complete before we call fetchSettings
                 doneSignal.countDown();
             }
         });
@@ -412,7 +362,6 @@ public class MainActivity extends AppCompatActivity {
 
         Request request = new Request.Builder()
                 .url(url)
-                .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
 
@@ -427,23 +376,28 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                if (response.isSuccessful()) {
-                    final String mMessage = response.body().string();
+                try (ResponseBody responseBody = response.body()) {
 
-                    MainActivity.this.runOnUiThread(() -> {
-                        Log.i("fetchModeNames::onResponse", mMessage);
-                        try {
-                            JSONArray modes = new JSONArray(mMessage);
+                    if (response.isSuccessful()) {
+                        String mMessage = responseBody.string();
 
-                            for (int i = 0; i < modes.length(); i++) {
-                                modeNamesList.add(modes.getString(i));
+                        MainActivity.this.runOnUiThread(() -> {
+                            Log.i("fetchModeNames::onResponse", mMessage);
+                            try {
+                                JSONArray modes = new JSONArray(mMessage);
+
+                                for (int i = 0; i < modes.length(); i++) {
+                                    modeNamesList.add(modes.getString(i));
+                                }
+                                modeAdapter.notifyDataSetChanged();
+                            } catch (JSONException e) {
+                                e.printStackTrace();
                             }
-                            modeAdapter.notifyDataSetChanged();
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    });
+                        });
+                    }
                 }
+
+                // decrement the count of fetch tasks that need to complete before we call fetchSettings
                 doneSignal.countDown();
             }
         });
@@ -455,7 +409,6 @@ public class MainActivity extends AppCompatActivity {
 
         Request request = new Request.Builder()
                 .url(url)
-                .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
 
@@ -470,23 +423,28 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                if (response.isSuccessful()) {
-                    final String mMessage = response.body().string();
+                try (ResponseBody responseBody = response.body()) {
 
-                    MainActivity.this.runOnUiThread(() -> {
-                        Log.i("fetchDrawStyles::onResponse", mMessage);
-                        try {
-                            JSONArray modes = new JSONArray(mMessage);
+                    if (response.isSuccessful()) {
+                        String mMessage = responseBody.string();
 
-                            for (int i = 0; i < modes.length(); i++) {
-                                drawStylesList.add(modes.getString(i));
+                        MainActivity.this.runOnUiThread(() -> {
+                            Log.i("fetchDrawStyles::onResponse", mMessage);
+                            try {
+                                JSONArray modes = new JSONArray(mMessage);
+
+                                for (int i = 0; i < modes.length(); i++) {
+                                    drawStylesList.add(modes.getString(i));
+                                }
+                                drawStylesAdapter.notifyDataSetChanged();
+                            } catch (JSONException e) {
+                                e.printStackTrace();
                             }
-                            drawStylesAdapter.notifyDataSetChanged();
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    });
+                        });
+                    }
                 }
+
+                // decrement the count of fetch tasks that need to complete before we call fetchSettings
                 doneSignal.countDown();
             }
         });
@@ -498,8 +456,7 @@ public class MainActivity extends AppCompatActivity {
 
         Request request = new Request.Builder()
                 .url(url)
-                .tag(fetchTAG)
-                .header("Accept", "application/json")
+                .tag(fetchSettingsTAG)
                 .header("Content-Type", "application/json")
                 .build();
 
@@ -514,36 +471,40 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-                if (response.isSuccessful()) {
-                    final String mMessage = response.body().string();
+                try (ResponseBody responseBody = response.body()) {
 
-                    MainActivity.this.runOnUiThread(() -> {
-                        Log.i("fetchSettings::onResponse", mMessage);
-                        try {
-                            JSONObject settings = new JSONObject(mMessage);
+                    if (response.isSuccessful()) {
+                        String mMessage = responseBody.string();
 
-                            // update the UI to reflect the current Kaleidoscope settings
-                            String mode = settings.getString("mode");
-                            modeNamesSpinner.setSelection(modeNamesList.indexOf(mode));
-                            clockFacesSpinner.setSelection(clockFacesList.indexOf(settings.getString("clockFace")));
-                            drawStylesSpinner.setSelection(drawStylesList.indexOf(settings.getString("drawStyle")));
-                            brightnessSeekBar.setProgress(settings.getInt("brightness"));
-                            speedSeekBar.setProgress(settings.getInt("speed"));
-                            clockColor = (int) settings.get("clockColor");
+                        MainActivity.this.runOnUiThread(() -> {
+                            Log.i("fetchSettings::onResponse", mMessage);
+                            try {
+                                JSONObject settings = new JSONObject(mMessage);
 
-                            // update the power button state
-                            if (mode.equals("off")) {
-                                powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonRed));
-                                powerOn = false;
+                                // update the UI to reflect the current Kaleidoscope settings
+                                String mode = settings.getString("mode");
+                                modeNamesSpinner.setSelection(modeNamesList.indexOf(mode));
+                                clockFacesSpinner.setSelection(clockFacesList.indexOf(settings.getString("clockFace")));
+                                drawStylesSpinner.setSelection(drawStylesList.indexOf(settings.getString("drawStyle")));
+                                brightnessSeekBar.setProgress(settings.getInt("brightness"));
+                                speedSeekBar.setProgress(settings.getInt("speed"));
+                                clockColor = (int) settings.get("clockColor");
+
+                                // update the power button state
+                                if (mode.equals("off")) {
+                                    powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonRed));
+                                    powerOn = false;
+                                }
+                                else {
+                                    powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
+                                    powerOn = true;
+                                }
+                            } catch (JSONException e) {
+                                e.printStackTrace();
                             }
-                            else {
-                                powerButton.getBackground().mutate().setTint(ContextCompat.getColor(getApplicationContext(), R.color.powerButtonBlue));
-                                powerOn = true;
-                            }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    });
+                        });
+                    } else
+                        responseBody.close();
                 }
             }
         });
@@ -558,17 +519,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void cancelCallWithTag(OkHttpClient client, String tag) {
+
         if (client == null || tag == null)
             return;
 
         // A call may transition from queue -> running. Remove queued Calls first.
-        for(Call call : client.dispatcher().queuedCalls()) {
-            if(call.request().tag().equals(tag))
+        for (Call call : client.dispatcher().queuedCalls()) {
+            if (call.request().tag() != null && call.request().tag().equals(tag)) {
+                Log.w("cancelCallWithTag::queuedCalls", "");
                 call.cancel();
+            }
         }
-        for(Call call : client.dispatcher().runningCalls()) {
-            if(call.request().tag().equals(tag))
+        for (Call call : client.dispatcher().runningCalls()) {
+            if (call.request().tag() != null && call.request().tag().equals(tag)) {
+                Log.w("cancelCallWithTag::queuedCalls", "");
                 call.cancel();
+            }
         }
     }
 }
