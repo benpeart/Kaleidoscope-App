@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
 
     // track the power on/off state and clock color here as they don't have persistent state in the UI controls
     boolean powerOn = true;
-    int clockColor = 0;
+    String clockColor = "#FFFFFF";
 
     SeekBar speedSeekBar, brightnessSeekBar;
     FloatingActionButton powerButton;
@@ -116,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         colorWheelButton.setOnClickListener(v -> new ColorPickerPopup.Builder(MainActivity.this)
-                .initialColor(clockColor) // Set initial color
+                .initialColor(Color.parseColor(clockColor)) // Set initial color
                 .enableBrightness(true) // Enable brightness slider or not
                 .enableAlpha(false) // Enable alpha slider or not
                 .okTitle("Choose")
@@ -127,8 +127,7 @@ public class MainActivity extends AppCompatActivity {
                 .show(v, new ColorPickerPopup.ColorPickerObserver() {
                     @Override
                     public void onColorPicked(int color) {
-                        clockColor = getRgbFromHex("#" + Integer.toHexString(color));
-                        makePost(null, null, null, null, null, clockColor, "colorWheelButton onClick");
+                        makePost(null, null, null, null, null, color, "colorWheelButton onClick");
                     }
                 }));
 
@@ -227,6 +226,7 @@ public class MainActivity extends AppCompatActivity {
         // Call fetchSettings every 2 seconds to update the app with the current
         // settings from the Kaleidoscope (in case another app or the physical knobs
         // have been used to make changes).
+/*
         final Handler handler = new Handler();
         final int refreshRate = 2000; // 2.0 sec
 
@@ -237,6 +237,7 @@ public class MainActivity extends AppCompatActivity {
                 handler.postDelayed(this, refreshRate);
             }
         }, refreshRate);
+*/
     }
 
     // onStart() is called when the activity is becoming visible to the user
@@ -488,7 +489,7 @@ public class MainActivity extends AppCompatActivity {
                                 drawStylesSpinner.setSelection(drawStylesList.indexOf(settings.getString("drawStyle")));
                                 brightnessSeekBar.setProgress(settings.getInt("brightness"));
                                 speedSeekBar.setProgress(settings.getInt("speed"));
-                                clockColor = (int) settings.get("clockColor");
+                                clockColor = settings.getString("clockColor");
 
                                 // update the power button state
                                 if (mode.equals("off")) {
@@ -508,14 +509,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-    }
-
-    private int getRgbFromHex(String hex) { //#ffffff red green blue 0-255  ->255, 0, 0 255 255 255
-        int initColor = Color.parseColor(hex);
-        int r = Color.red(initColor);
-        int g = Color.green(initColor);
-        int b = Color.blue(initColor);
-        return r << 16 | g << 8 | b;
     }
 
     private void cancelCallWithTag(OkHttpClient client, String tag) {
